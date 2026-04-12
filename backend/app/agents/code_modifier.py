@@ -1,9 +1,10 @@
 """Code Modifier agent — deterministic DOM patcher. No LLM involved in happy path."""
 
-from langgraph.config import get_stream_writer
+from langgraph.types import StreamWriter
 
+from app.agents.utils import extract_json, unwrap_list
 from app.models.patch_spec import PatchSpec
-from app.models.pipeline import PageSnapshot, PipelineState
+from app.models.pipeline import PageSnapshot
 from app.models.qa_report import QAReport
 from app.storage.artifacts import save_html, save_screenshot
 from app.tools.html_patcher import apply_patch
@@ -11,74 +12,83 @@ from app.tools.screenshot import capture_screenshot_from_html
 from app.tools.url_rewriter import rewrite_urls_with_base_tag
 
 
-async def code_modifier_node(state: dict) -> dict:
+async def code_modifier_node(state: dict, writer: StreamWriter) -> dict:
     """
     LangGraph node: apply PatchSpec to raw HTML → modified HTML + screenshot.
 
-    This is a deterministic tool node — no LLM call in the happy path.
-    On QA retry, incorporates failure reasons from QAReport into a revised patch
-    (LLM-assisted only on retry to fix broken selectors or hallucinated content).
+    Deterministic tool node — no LLM in the happy path.
+    On QA retry, uses Gemini Flash to revise broken patches.
     """
-    writer = get_stream_writer()
     writer({"event": "stage_start", "stage": "code_modifier", "message": "Applying personalization changes..."})
 
-    ps = PipelineState(**state)
-    patch_spec = PatchSpec(**ps.patch_spec) if isinstance(ps.patch_spec, dict) else ps.patch_spec
-    snapshot = PageSnapshot(**ps.page_snapshot) if isinstance(ps.page_snapshot, dict) else ps.page_snapshot
+    try:
+        run_id = state["run_id"]
+        retry_count = state.get("retry_count", 0)
 
-    # On retry — optionally revise patch based on QA feedback
-    if ps.retry_count > 0 and ps.qa_report:
-        qa = QAReport(**ps.qa_report) if isinstance(ps.qa_report, dict) else ps.qa_report
-        patch_spec = await _revise_patch_for_retry(patch_spec, qa, ps)
-        writer({"event": "stage_progress", "stage": "code_modifier",
-                "message": f"Retry {ps.retry_count}: revising patch based on QA feedback..."})
+        patch_spec = PatchSpec.model_validate(state["patch_spec"])
+        snapshot = PageSnapshot.model_validate(state["page_snapshot"])
 
-    # Apply patches
-    modified_html, warnings = apply_patch(snapshot.raw_html, patch_spec)
+        # On retry — revise patch based on QA feedback
+        if retry_count > 0 and state.get("qa_report"):
+            qa = QAReport.model_validate(state["qa_report"])
+            writer({
+                "event": "stage_progress",
+                "stage": "code_modifier",
+                "message": f"Retry {retry_count}: revising patch based on QA feedback...",
+            })
+            patch_spec = await _revise_patch_for_retry(patch_spec, qa, state)
 
-    if warnings:
-        writer({"event": "stage_progress", "stage": "code_modifier",
-                "message": f"Applied with {len(warnings)} selector warning(s)"})
+        # Apply patches deterministically
+        modified_html, warnings = apply_patch(snapshot.raw_html, patch_spec)
 
-    # Inject base tag so relative URLs resolve correctly in preview
-    modified_html = rewrite_urls_with_base_tag(modified_html, snapshot.url)
+        if warnings:
+            writer({
+                "event": "stage_progress",
+                "stage": "code_modifier",
+                "message": f"Applied with {len(warnings)} selector warning(s): {warnings[0]}",
+            })
 
-    # Save modified HTML artifact
-    html_path = await save_html(ps.run_id, modified_html, variant="variant")
+        # Inject base tag so relative URLs resolve in preview iframes
+        modified_html = rewrite_urls_with_base_tag(modified_html, snapshot.url)
 
-    # Capture screenshot of modified page
-    screenshot_bytes = await capture_screenshot_from_html(modified_html, ps.run_id, "modified")
-    screenshot_path = None
-    if screenshot_bytes:
-        screenshot_path = await save_screenshot(ps.run_id, screenshot_bytes, variant="modified")
+        # Save artifacts
+        await save_html(run_id, modified_html, variant="variant")
+        screenshot_bytes = await capture_screenshot_from_html(modified_html, run_id, "modified")
+        screenshot_path = None
+        if screenshot_bytes:
+            screenshot_path = await save_screenshot(run_id, screenshot_bytes, variant="modified")
 
-    # Increment retry_count only if this was triggered by a QA failure
-    new_retry_count = ps.retry_count
-    if ps.qa_report:
-        qa = QAReport(**ps.qa_report) if isinstance(ps.qa_report, dict) else ps.qa_report
-        if not qa.passed:
-            new_retry_count += 1
+        # Increment retry_count if this run was triggered by a QA failure
+        new_retry_count = retry_count
+        if state.get("qa_report"):
+            qa = QAReport.model_validate(state["qa_report"])
+            if not qa.passed:
+                new_retry_count += 1
 
-    writer({"event": "stage_complete", "stage": "code_modifier",
-            "message": f"Changes applied — {len(patch_spec.operations)} operations"})
+        writer({
+            "event": "stage_complete",
+            "stage": "code_modifier",
+            "message": f"Changes applied — {len(patch_spec.operations)} operations",
+        })
 
-    return {
-        "modified_html": modified_html,
-        "modified_screenshot_path": screenshot_path,
-        "retry_count": new_retry_count,
-        "current_stage": "code_modifier_complete",
-    }
+        return {
+            "modified_html": modified_html,
+            "modified_screenshot_path": screenshot_path,
+            "retry_count": new_retry_count,
+            "current_stage": "code_modifier_complete",
+        }
+
+    except Exception as e:
+        writer({"event": "stage_error", "stage": "code_modifier", "message": f"Patching failed: {e}"})
+        raise
 
 
 async def _revise_patch_for_retry(
     original_patch: PatchSpec,
     qa_report: QAReport,
-    state: PipelineState,
+    state: dict,
 ) -> PatchSpec:
-    """
-    Use Gemini Flash to produce a revised PatchSpec that addresses QA failures.
-    Only called on retry (retry_count > 0).
-    """
+    """Gemini Flash revises a PatchSpec to address QA failures. Only called on retry."""
     import json
     from google import genai
     from google.genai import types
@@ -99,7 +109,7 @@ Produce a revised PatchSpec that fixes these issues."""
 
     response = client.models.generate_content(
         model=settings.gemini_flash_model,
-        contents=user_content,
+        contents=[types.Content(role="user", parts=[types.Part(text=user_content)])],
         config=types.GenerateContentConfig(
             system_instruction=CODE_MODIFIER_RETRY_PROMPT,
             thinking_config=types.ThinkingConfig(thinking_level="low"),
@@ -107,4 +117,5 @@ Produce a revised PatchSpec that fixes these issues."""
         ),
     )
 
-    return PatchSpec.model_validate_json(response.text)
+    raw = unwrap_list(extract_json(response.text))
+    return PatchSpec.model_validate(raw)

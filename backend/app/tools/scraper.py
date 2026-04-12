@@ -2,6 +2,10 @@
 
 If FIRECRAWL_API_KEY is not set, falls back to Playwright + html2text.
 Both paths return the same dict shape: {rawHtml, markdown, screenshot_bytes}.
+
+Windows note: asyncio.SelectorEventLoop (used by uvicorn on Windows) cannot
+spawn subprocesses. Playwright uses subprocess to talk to the browser.
+Fix: use synchronous Playwright API inside asyncio.to_thread().
 """
 
 import asyncio
@@ -50,8 +54,8 @@ async def _scrape_with_firecrawl(url: str) -> dict:
         response.raise_for_status()
         data = response.json().get("data", {})
 
-    # Take screenshot separately with Playwright (Firecrawl doesn't return image bytes)
-    screenshot_bytes = await _take_playwright_screenshot(url)
+    # Screenshot via sync Playwright in thread (safe on Windows SelectorEventLoop)
+    screenshot_bytes = await asyncio.to_thread(_sync_playwright_screenshot, url)
 
     return {
         "rawHtml": data.get("rawHtml", ""),
@@ -65,14 +69,25 @@ async def _scrape_with_firecrawl(url: str) -> dict:
 async def _scrape_with_playwright(url: str) -> dict:
     """
     Playwright-only scraping — headless Chromium, no external API.
-    Generates markdown from HTML using html2text.
+    Runs synchronous Playwright in a thread (required on Windows).
+    """
+    result = await asyncio.to_thread(_sync_playwright_scrape, url)
+    return result
+
+
+# ── Sync Playwright helpers (thread-safe on Windows) ─────────────────────────
+
+def _sync_playwright_scrape(url: str) -> dict:
+    """
+    Synchronous Playwright scrape — called via asyncio.to_thread().
+    Uses sync_playwright which doesn't require ProactorEventLoop on Windows.
     """
     try:
-        from playwright.async_api import async_playwright
+        from playwright.sync_api import sync_playwright
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page(
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(
                 viewport={"width": 1440, "height": 900},
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -80,17 +95,14 @@ async def _scrape_with_playwright(url: str) -> dict:
                     "Chrome/122.0.0.0 Safari/537.36"
                 ),
             )
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            import time; time.sleep(2)  # Let lazy-loaded content settle
 
-            await page.goto(url, wait_until="networkidle", timeout=30000)
-            await asyncio.sleep(1.5)  # Let lazy-loaded content settle
-
-            raw_html = await page.content()
-            screenshot_bytes = await page.screenshot(full_page=True, type="png")
-
-            await browser.close()
+            raw_html = page.content()
+            screenshot_bytes = page.screenshot(full_page=True, type="png")
+            browser.close()
 
         markdown = _html_to_markdown(raw_html)
-
         return {
             "rawHtml": raw_html,
             "markdown": markdown,
@@ -102,18 +114,21 @@ async def _scrape_with_playwright(url: str) -> dict:
         return {"rawHtml": "", "markdown": None, "screenshot_bytes": None}
 
 
-async def _take_playwright_screenshot(url: str) -> Optional[bytes]:
-    """Capture a full-page screenshot — used alongside Firecrawl."""
+def _sync_playwright_screenshot(url: str) -> Optional[bytes]:
+    """
+    Capture a full-page screenshot synchronously — called via asyncio.to_thread().
+    Used alongside Firecrawl (which returns HTML/markdown but not screenshots).
+    """
     try:
-        from playwright.async_api import async_playwright
+        from playwright.sync_api import sync_playwright
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page(viewport={"width": 1440, "height": 900})
-            await page.goto(url, wait_until="networkidle", timeout=30000)
-            await asyncio.sleep(1)
-            screenshot_bytes = await page.screenshot(full_page=True, type="png")
-            await browser.close()
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1440, "height": 900})
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            import time; time.sleep(1.5)
+            screenshot_bytes = page.screenshot(full_page=True, type="png")
+            browser.close()
             return screenshot_bytes
 
     except Exception as e:
@@ -127,7 +142,7 @@ def _html_to_markdown(html: str) -> Optional[str]:
     """
     Convert raw HTML to clean markdown using html2text.
     Strips navigation, scripts, styles — leaves content text.
-    Falls back to None if html2text is not installed.
+    Falls back to BeautifulSoup plain text if html2text not installed.
     """
     try:
         import html2text
@@ -142,7 +157,6 @@ def _html_to_markdown(html: str) -> Optional[str]:
         return h.handle(html)[:15000]  # Cap at 15k chars — enough for LLM context
 
     except ImportError:
-        # html2text not installed — extract plain text via BeautifulSoup as fallback
         try:
             from bs4 import BeautifulSoup
             soup = BeautifulSoup(html, "lxml")

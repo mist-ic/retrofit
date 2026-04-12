@@ -49,6 +49,11 @@ Return a JSON object with this exact structure:
         "selector": "h1.hero__title",
         "html": "<div style=\\"background:#e53e3e;color:#fff;padding:6px 12px;display:inline-block;border-radius:4px;font-size:14px;font-weight:600;margin-bottom:8px;\\">Limited time offer</div>"
       }
+      {
+        "op": "replaceStyle",
+        "selector": "a.btn-primary",
+        "css_text": "background-color: #e53e3e; color: #fff; border-color: #e53e3e;"
+      }
     ]
   },
   "explanations": [

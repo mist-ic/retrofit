@@ -1,5 +1,3 @@
-"""Artifact storage — saves/loads HTML, screenshots, and run configs (local or GCS)."""
-
 import json
 import os
 import tempfile
@@ -8,9 +6,6 @@ from typing import Optional
 
 from app.config import settings
 
-# In-memory store for run configs (replace with Redis/Firestore for production)
-_run_configs: dict[str, dict] = {}
-
 # Local artifact root (used when use_local_storage=True)
 _LOCAL_ROOT = Path(tempfile.gettempdir()) / "retrofit_artifacts"
 
@@ -18,15 +13,19 @@ _LOCAL_ROOT = Path(tempfile.gettempdir()) / "retrofit_artifacts"
 # ── Run config ────────────────────────────────────────────────────────────────
 
 async def store_run_config(run_id: str, config: dict) -> None:
-    """Persist run configuration so the stream endpoint can retrieve it."""
-    _run_configs[run_id] = config
+    """Persist run configuration to disk so it survives hot-reloads."""
+    run_dir = _LOCAL_ROOT / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    config_path = run_dir / "run_config.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
 
 
 async def get_run_config(run_id: str) -> dict:
-    """Retrieve a run's configuration by ID."""
-    if run_id not in _run_configs:
-        raise KeyError(f"Run {run_id} not found")
-    return _run_configs[run_id]
+    """Retrieve a run's configuration by ID from disk."""
+    config_path = _LOCAL_ROOT / run_id / "run_config.json"
+    if config_path.exists():
+        return json.loads(config_path.read_text(encoding="utf-8"))
+    raise KeyError(f"Run {run_id} not found")
 
 
 # ── Screenshot ────────────────────────────────────────────────────────────────

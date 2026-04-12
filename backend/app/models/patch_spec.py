@@ -2,7 +2,7 @@
 
 from typing import Annotated, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ReplaceTextOp(BaseModel):
@@ -64,11 +64,25 @@ class InsertAfterOp(BaseModel):
 class ReplaceStyleOp(BaseModel):
     """Override the inline style of an element."""
 
+    model_config = ConfigDict(extra="ignore")
+
     op: Literal["replaceStyle"]
     selector: str
     css_text: str = Field(
         description="Full inline style string, e.g. 'color: #fff; background: #e53e3e;'"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_css_alias(cls, data: object) -> object:
+        """LLM sometimes returns 'css', 'style', or 'css_value' instead of 'css_text'."""
+        if isinstance(data, dict) and "css_text" not in data:
+            for alias in ("css", "style", "css_value", "value"):
+                if alias in data:
+                    data = dict(data)
+                    data["css_text"] = data.pop(alias)
+                    break
+        return data
 
 
 # Discriminated union — Pydantic uses the 'op' literal to pick the right model.

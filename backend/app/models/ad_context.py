@@ -2,7 +2,7 @@
 
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .shared import ColorSwatch
 
@@ -10,8 +10,11 @@ from .shared import ColorSwatch
 class AdContext(BaseModel):
     """Structured representation of an ad creative, extracted via Gemini vision."""
 
+    model_config = ConfigDict(extra="ignore")
+
     # ── Copy ──────────────────────────────────────────────────────────────────
-    headline: str = Field(description="Primary headline text visible in the ad")
+    # headline is Optional — Gemini returns null when no image is provided
+    headline: Optional[str] = Field(default="(no headline)", description="Primary headline text visible in the ad")
     subheadline: Optional[str] = Field(default=None, description="Secondary headline or tagline")
     body_text: Optional[str] = Field(default=None, description="Any additional body copy")
     primary_cta_text: Optional[str] = Field(default=None, description="CTA button text if visible")
@@ -19,7 +22,8 @@ class AdContext(BaseModel):
 
     # ── Offer ─────────────────────────────────────────────────────────────────
     offer_type: Literal["percent_discount", "amount_discount", "bogo", "free_shipping", "none"] = Field(
-        description="Type of offer shown in the ad"
+        default="none",
+        description="Type of offer shown in the ad",
     )
     discount_percent: Optional[float] = Field(default=None, description="e.g. 40.0 for 40% OFF")
     discount_amount: Optional[float] = Field(default=None, description="e.g. 500.0 for ₹500 OFF")

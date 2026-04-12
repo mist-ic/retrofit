@@ -9,7 +9,7 @@ from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.agents.graph import pipeline_graph
-from app.models.pipeline import PipelineState, RunResult
+from app.models.pipeline import ExplanationItem, PageSnapshot, RunResult
 from app.models.ad_context import AdContext
 from app.models.cro_findings import CROFindings
 from app.models.patch_spec import PatchSpec
@@ -29,7 +29,7 @@ async def create_run(
 ):
     """
     Start a new pipeline run. Returns run_id immediately.
-    The frontend then connects to /api/runs/{run_id}/stream for SSE events.
+    The frontend connects to /api/runs/{run_id}/stream for SSE events.
     """
     run_id = str(uuid.uuid4())
 
@@ -53,7 +53,11 @@ async def create_run(
 async def stream_run(run_id: str):
     """
     Stream pipeline execution events via Server-Sent Events (SSE).
-    Events: stage_start, stage_progress, stage_complete, node_complete, run_complete, run_error.
+
+    LangGraph 1.x streaming:
+    - stream_mode=["updates", "custom"] yields tuples: (mode, data)
+    - "custom" mode: data emitted by writer() inside each node
+    - "updates" mode: {node_name: {output_keys}} after each node completes
     """
     async def event_generator():
         try:
@@ -71,35 +75,40 @@ async def stream_run(run_id: str):
 
             thread_config = {"configurable": {"thread_id": run_id}}
 
-            async for event in pipeline_graph.astream(
+            # In LangGraph 1.x, astream with multiple modes yields (mode, data) tuples
+            async for event_tuple in pipeline_graph.astream(
                 initial_state,
                 stream_mode=["updates", "custom"],
                 config=thread_config,
             ):
-                # LangGraph streams tuples: (mode, data)
-                if isinstance(event, tuple):
-                    stream_mode, data = event
+                # Unpack mode + data — use distinct variable names to avoid shadowing
+                if isinstance(event_tuple, tuple):
+                    event_mode, event_data = event_tuple
                 else:
-                    stream_mode, data = "updates", event
+                    event_mode, event_data = "updates", event_tuple
 
-                if stream_mode == "custom":
-                    # Custom events emitted via get_stream_writer()
-                    yield _sse(data.get("event", "custom"), data)
+                if event_mode == "custom":
+                    # Custom events emitted via writer() inside each node
+                    evt = event_data.get("event", "custom")
+                    yield _sse(evt, event_data)
 
-                elif stream_mode == "updates":
-                    for node_name, node_output in data.items():
+                elif event_mode == "updates":
+                    # Node completed — emit node_complete with updated keys
+                    for node_name, node_output in event_data.items():
                         yield _sse("node_complete", {
                             "node": node_name,
                             "keys_updated": list(node_output.keys()),
                         })
 
-            # Pipeline complete — build final result
-            final_state = pipeline_graph.get_state(config=thread_config)
-            result = _build_run_result(run_id, final_state.values)
+            # Pipeline finished — build and emit final result
+            final_state_snapshot = pipeline_graph.get_state(config=thread_config)
+            result = _build_run_result(run_id, final_state_snapshot.values)
             yield _sse("run_complete", result.model_dump())
 
         except Exception as e:
-            yield _sse("run_error", {"error": str(e)})
+            import traceback
+            print(f"[runs] Pipeline error for run {run_id}:\n{traceback.format_exc()}")
+            yield _sse("run_error", {"error": str(e), "run_id": run_id})
 
     return StreamingResponse(
         event_generator(),
@@ -118,8 +127,8 @@ async def stream_run(run_id: str):
 async def get_result(run_id: str):
     """Get the final result of a completed run (polling fallback for SSE)."""
     thread_config = {"configurable": {"thread_id": run_id}}
-    final_state = pipeline_graph.get_state(config=thread_config)
-    result = _build_run_result(run_id, final_state.values)
+    final_state_snapshot = pipeline_graph.get_state(config=thread_config)
+    result = _build_run_result(run_id, final_state_snapshot.values)
     return result.model_dump()
 
 
@@ -131,27 +140,29 @@ def _sse(event: str, data: dict) -> str:
 
 
 def _build_run_result(run_id: str, state: dict) -> RunResult:
-    """Construct a RunResult from the final pipeline state."""
-    qa_report = state.get("qa_report") or {}
-    passed = qa_report.get("passed", False) if qa_report else False
-    has_warnings = not passed
+    """Construct a RunResult from the final pipeline state dict."""
+    qa_report_dict = state.get("qa_report") or {}
+    passed = qa_report_dict.get("passed", False) if qa_report_dict else False
 
-    status = "completed" if passed else ("completed_with_warnings" if state.get("modified_html") else "failed")
+    if state.get("modified_html"):
+        status = "completed" if passed else "completed_with_warnings"
+    else:
+        status = "failed"
 
-    base_url = f"/api"
+    base = "/api"
 
     return RunResult(
         run_id=run_id,
         status=status,
-        original_html_url=f"{base_url}/preview/{run_id}/original",
-        modified_html_url=f"{base_url}/preview/{run_id}/variant",
-        original_screenshot_url=f"{base_url}/screenshots/{run_id}/original",
-        modified_screenshot_url=f"{base_url}/screenshots/{run_id}/modified",
-        ad_context=AdContext(**state["ad_context"]) if state.get("ad_context") else _empty_ad_context(),
-        cro_findings=CROFindings(**state["cro_findings"]) if state.get("cro_findings") else _empty_cro_findings(),
-        patch_spec=PatchSpec(**state["patch_spec"]) if state.get("patch_spec") else _empty_patch_spec(),
-        qa_report=QAReport(**state["qa_report"]) if state.get("qa_report") else _empty_qa_report(),
-        explanations=state.get("explanations", []),
+        original_html_url=f"{base}/preview/{run_id}/original",
+        modified_html_url=f"{base}/preview/{run_id}/variant",
+        original_screenshot_url=f"{base}/screenshots/{run_id}/original",
+        modified_screenshot_url=f"{base}/screenshots/{run_id}/modified",
+        ad_context=AdContext.model_validate(state["ad_context"]) if state.get("ad_context") else _empty_ad_context(),
+        cro_findings=CROFindings.model_validate(state["cro_findings"]) if state.get("cro_findings") else _empty_cro_findings(),
+        patch_spec=PatchSpec.model_validate(state["patch_spec"]) if state.get("patch_spec") else _empty_patch_spec(),
+        qa_report=QAReport.model_validate(state["qa_report"]) if state.get("qa_report") else _empty_qa_report(),
+        explanations=[ExplanationItem.model_validate(e) for e in state.get("explanations", [])],
         cro_score_before=state.get("cro_score_before") or 0.0,
         cro_score_after=state.get("cro_score_after") or 0.0,
         predicted_lift_range=state.get("predicted_lift_range") or "0-2%",
@@ -159,13 +170,17 @@ def _build_run_result(run_id: str, state: dict) -> RunResult:
 
 
 def _empty_ad_context() -> AdContext:
-    from app.models.ad_context import AdContext
     return AdContext(headline="(unavailable)", offer_type="none")
 
 
 def _empty_cro_findings() -> CROFindings:
-    from app.models.cro_findings import CROFindings
-    return CROFindings(overall_score=0, criteria=[], top_issues=[], change_candidates=[], summary="Pipeline did not complete")
+    return CROFindings(
+        overall_score=0,
+        criteria=[],
+        top_issues=[],
+        change_candidates=[],
+        summary="Pipeline did not complete",
+    )
 
 
 def _empty_patch_spec() -> PatchSpec:
@@ -173,4 +188,10 @@ def _empty_patch_spec() -> PatchSpec:
 
 
 def _empty_qa_report() -> QAReport:
-    return QAReport(variant_id="empty", passed=False, is_valid_html=False, key_elements_present=False, grounded_change_count=0)
+    return QAReport(
+        variant_id="empty",
+        passed=False,
+        is_valid_html=False,
+        key_elements_present=False,
+        grounded_change_count=0,
+    )

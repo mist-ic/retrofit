@@ -10,21 +10,23 @@ from app.config import settings
 async def capture_screenshot_from_html(html_content: str, run_id: str, variant: str) -> Optional[bytes]:
     """
     Render an HTML string in a headless browser and capture a full-page screenshot.
+    Uses sync Playwright in a thread (required on Windows SelectorEventLoop).
     Returns PNG bytes or None if capture fails.
     """
+    return await asyncio.to_thread(_sync_capture_from_html, html_content, run_id, variant)
+
+
+def _sync_capture_from_html(html_content: str, run_id: str, variant: str) -> Optional[bytes]:
     try:
-        from playwright.async_api import async_playwright
+        from playwright.sync_api import sync_playwright
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page(viewport={"width": 1440, "height": 900})
-
-            # Load HTML directly as content (not via URL)
-            await page.set_content(html_content, wait_until="networkidle", timeout=20000)
-            await asyncio.sleep(0.5)
-
-            screenshot_bytes = await page.screenshot(full_page=True, type="png")
-            await browser.close()
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1440, "height": 900})
+            page.set_content(html_content, wait_until="networkidle", timeout=20000)
+            import time; time.sleep(0.5)
+            screenshot_bytes = page.screenshot(full_page=True, type="png")
+            browser.close()
             return screenshot_bytes
 
     except Exception as e:

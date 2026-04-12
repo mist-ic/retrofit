@@ -113,15 +113,16 @@ def detect_hallucinations(
             ))
 
     # ── Check for invented promo codes ────────────────────────────────────────
-    code_pattern = re.compile(r"\b([A-Z]{3,10}\d*)\b")
+    # Real promo codes always mix letters + numbers (e.g. HAIR40, SAVE15, OFF20).
+    # Pure uppercase words (ONION, SHOP, HAIR) are NOT promo codes — they're product names.
+    code_pattern = re.compile(r"\b([A-Z]{2,8}\d{1,6}|\d{1,6}[A-Z]{2,8})\b")
     original_codes = set(code_pattern.findall(original_text))
     modified_codes = set(code_pattern.findall(modified_text))
-    ad_code = ad_context.discount_code or ""
+    ad_code = (ad_context.discount_code or "").upper()
 
     new_codes = modified_codes - original_codes
     for code in new_codes:
-        if code != ad_code and len(code) >= 4:
-            # Heuristic: looks like a promo code
+        if code != ad_code:
             flags.append(HallucinationFlag(
                 code="INVENTED_PROMO_CODE",
                 message=f"Promo code '{code}' appears in modified page but not in original or ad",
