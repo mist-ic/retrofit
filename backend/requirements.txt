@@ -11,8 +11,10 @@ pydantic-settings>=2.0.0
 google-genai>=1.0.0
 
 # Agent orchestration
+# langgraph: the StateGraph pipeline itself — core, required
+# langchain-core: base types that langgraph depends on internally — required but never called directly
+# langchain-google-genai: NOT used — we call google-genai SDK directly, not via LangChain wrappers
 langgraph>=0.4.0
-langchain-google-genai>=2.0.0
 langchain-core>=0.3.0
 
 # Web scraping
