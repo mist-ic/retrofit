@@ -16,8 +16,9 @@ langchain-google-genai>=2.0.0
 langchain-core>=0.3.0
 
 # Web scraping
-firecrawl-py>=1.0.0
+firecrawl-py>=1.0.0  # Optional — set FIRECRAWL_API_KEY to enable; falls back to Playwright
 playwright>=1.48.0
+html2text>=2020.1.16  # Markdown conversion for Playwright-only path
 
 # HTML parsing and DOM manipulation
 beautifulsoup4>=4.12.0
