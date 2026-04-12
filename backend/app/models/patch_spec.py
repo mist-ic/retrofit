@@ -2,7 +2,7 @@
 
 from typing import Annotated, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Discriminator, Field, Tag
+from pydantic import BaseModel, Field
 
 
 class ReplaceTextOp(BaseModel):
@@ -39,10 +39,21 @@ class RemoveClassOp(BaseModel):
     class_name: str
 
 
-class InsertHtmlOp(BaseModel):
-    """Insert an HTML snippet before or after a target element."""
+class InsertBeforeOp(BaseModel):
+    """Insert an HTML snippet immediately before a target element."""
 
-    op: Literal["insertBefore", "insertAfter"]
+    op: Literal["insertBefore"]
+    selector: str
+    html: str = Field(
+        description="Inline-styled HTML snippet to insert. Keep simple — "
+        "<div> or <span> with inline styles only."
+    )
+
+
+class InsertAfterOp(BaseModel):
+    """Insert an HTML snippet immediately after a target element."""
+
+    op: Literal["insertAfter"]
     selector: str
     html: str = Field(
         description="Inline-styled HTML snippet to insert. Keep simple — "
@@ -55,21 +66,25 @@ class ReplaceStyleOp(BaseModel):
 
     op: Literal["replaceStyle"]
     selector: str
-    css_text: str = Field(description="Full inline style string, e.g. 'color: #fff; background: #e53e3e;'")
+    css_text: str = Field(
+        description="Full inline style string, e.g. 'color: #fff; background: #e53e3e;'"
+    )
 
 
-# Discriminated union — Pydantic uses the 'op' field to pick the right model
+# Discriminated union — Pydantic uses the 'op' literal to pick the right model.
+# Each op value MUST map to exactly one class.
+# InsertBefore and InsertAfter are intentionally separate classes for this reason.
 PatchOperation = Annotated[
     Union[
-        Annotated[ReplaceTextOp, Tag("replaceText")],
-        Annotated[ReplaceAttributeOp, Tag("replaceAttribute")],
-        Annotated[AddClassOp, Tag("addClass")],
-        Annotated[RemoveClassOp, Tag("removeClass")],
-        Annotated[InsertHtmlOp, Tag("insertBefore")],
-        Annotated[InsertHtmlOp, Tag("insertAfter")],
-        Annotated[ReplaceStyleOp, Tag("replaceStyle")],
+        ReplaceTextOp,
+        ReplaceAttributeOp,
+        AddClassOp,
+        RemoveClassOp,
+        InsertBeforeOp,
+        InsertAfterOp,
+        ReplaceStyleOp,
     ],
-    Discriminator("op"),
+    Field(discriminator="op"),
 ]
 
 

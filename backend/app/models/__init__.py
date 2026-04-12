@@ -4,7 +4,8 @@ from .ad_context import AdContext
 from .cro_findings import ChangeCandidate, CROFindings, CROIssue, CriterionScore
 from .patch_spec import (
     AddClassOp,
-    InsertHtmlOp,
+    InsertAfterOp,
+    InsertBeforeOp,
     PatchOperation,
     PatchSpec,
     RemoveClassOp,
@@ -31,7 +32,8 @@ __all__ = [
     "ReplaceAttributeOp",
     "AddClassOp",
     "RemoveClassOp",
-    "InsertHtmlOp",
+    "InsertBeforeOp",
+    "InsertAfterOp",
     "ReplaceStyleOp",
     "PatchOperation",
     "PatchSpec",
