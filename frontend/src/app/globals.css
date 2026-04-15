@@ -1,0 +1,90 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-main: #0a0a0a;
+    --bg-secondary: #0a0a0a;
+    --fg-main: #ffffff;
+    --fg-muted: #777777;
+    --border-color: #2a2a2a;
+    --border-highlight: #D4FF26; /* Lime Green Highlight */
+    --acc-main: #D4FF26; /* Lime Green Accent */
+    
+    --font-heading: 'Playfair Display', serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--fg-main);
+    font-family: var(--font-body);
+    /* Subtle noise for high-end editorial feel */
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+    overscroll-behavior: none;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 500;
+  }
+}
+
+/* Structural UI Elements */
+.grid-panel {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  transition: border-color 0.4s ease;
+  position: relative;
+}
+
+.grid-panel:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Elegant line animations for inputs */
+.structural-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+.structural-input {
+  width: 100%;
+  background: transparent;
+  padding: 1rem 0;
+  color: var(--fg-main);
+  border-bottom: 1px solid var(--border-color);
+  transition: all 0.3s ease;
+  font-size: 1.125rem;
+}
+.structural-input:focus {
+  outline: none;
+}
+.structural-input-line {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  width: 0;
+  background-color: var(--border-highlight);
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.structural-input:focus ~ .structural-input-line {
+  width: 100%;
+}
+
+/* Custom minimal scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-main);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-muted);
+}

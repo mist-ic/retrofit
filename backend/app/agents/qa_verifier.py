@@ -151,12 +151,12 @@ async def _llm_hallucination_check(
 
 Check for hallucinations and return a JSON array of flags."""
 
-        response = client.models.generate_content(
+        response = await client.aio.models.generate_content(
             model=settings.gemini_flash_model,
             contents=[types.Content(role="user", parts=[types.Part(text=user_content)])],
             config=types.GenerateContentConfig(
                 system_instruction=QA_VERIFIER_HALLUCINATION_PROMPT,
-                thinking_config=types.ThinkingConfig(thinking_level="low"),
+                thinking_config=types.ThinkingConfig(thinking_level="high"),
                 response_mime_type="application/json",
             ),
         )

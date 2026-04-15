@@ -6,8 +6,8 @@ from typing import Optional
 from bs4 import BeautifulSoup, Tag
 
 from app.models.semantic_map import PageElement, SemanticMap
+from app.models.shared import BoundingBox
 from app.tools.shopify import get_shopify_hero_selectors
-
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
@@ -44,7 +44,10 @@ def merge_mappings(
     if vision_elements:
         for role, el in dom_elements.items():
             if role in vision_elements and vision_elements[role]:
-                el.bbox = vision_elements[role].get("bbox")
+                bbox_data = vision_elements[role].get("bbox")
+                if bbox_data and isinstance(bbox_data, dict):
+                    el.bbox = BoundingBox(**bbox_data)
+                
                 if "is_above_the_fold" in vision_elements[role]:
                     el.is_above_the_fold = vision_elements[role]["is_above_the_fold"]
 
@@ -81,8 +84,9 @@ async def vision_assisted_mapping(
     try:
         from google import genai
         from google.genai import types
+        from app.config import settings
 
-        client = genai.Client()
+        client = genai.Client(api_key=settings.gemini_api_key)
 
         prompt = """Look at this landing page screenshot and identify the bounding boxes
 of these elements if present: hero_headline, hero_subheadline, primary_cta, announcement_bar.
@@ -96,16 +100,17 @@ Return JSON with this structure:
 Only include elements you can clearly identify. Return null for missing elements.
 Return ONLY valid JSON."""
 
-        response = client.models.generate_content(
+        response = await client.aio.models.generate_content(
             model=llm_model,
-            contents=types.Content(
+            contents=[types.Content(
+                role="user",
                 parts=[
                     types.Part(text=prompt),
                     types.Part(
                         inline_data=types.Blob(mime_type="image/png", data=screenshot_bytes)
                     ),
-                ]
-            ),
+                ],
+            )],
             config=types.GenerateContentConfig(
                 thinking_config=types.ThinkingConfig(thinking_level="low"),
                 response_mime_type="application/json",

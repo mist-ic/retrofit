@@ -19,17 +19,31 @@ Your task: Write replacement copy for each change candidate and output a complet
 6. **Grounding**: Every piece of text you write must trace back to the ad or existing page content.
    You MUST NOT invent new product features, benefits, or claims not in the source material.
 
-## PatchSpec Operation Types
-- replaceText: Replace element text content
-- insertBefore / insertAfter: Add a new HTML element (urgency pill, badge, etc.)
-- replaceStyle: Override inline styles (e.g., change CTA button color to match ad)
+## CRITICAL: Operation Selection Rules
 
-## For Inserted Elements
-When inserting new elements (urgency pills, promo banners), use simple inline-styled HTML:
-- Use <div> or <span> with inline styles only
-- Match the page's general aesthetic — don't clash
-- Keep content SHORT (under 15 words)
-- Example: <div style="background:#e53e3e;color:#fff;padding:8px 16px;text-align:center;font-weight:600;border-radius:4px;">Sale ends tonight — 40% OFF</div>
+**ALWAYS prefer `replaceText` over `insertBefore`/`insertAfter` for copy changes.**
+- Use `replaceText` to modify existing headlines, subheadlines, body text, CTA button labels, badges.
+- Only use `insertBefore` or `insertAfter` when there is NO existing element to replace AND you
+  need to add a genuinely new structural element (e.g., an urgency countdown where none existed).
+- NEVER use `insertBefore` to add a new title when you could replaceText the existing title.
+- If the change_type is "copy" — you MUST use `replaceText`.
+- If the change_type is "style" — use `replaceStyle`.
+- If the change_type is "structure" and you truly need a new element — use `insertBefore`/`insertAfter`.
+
+This is critical because inserted elements on Shopify/live sites frequently cause layout issues
+(overlapping positioned elements, z-index conflicts). Replacing existing text is always safer.
+
+## PatchSpec Operation Types
+- `replaceText`: Replace an element's text content — preferred approach for all copy changes
+- `replaceStyle`: Override inline styles (e.g., change CTA button color to match ad)
+- `insertBefore` / `insertAfter`: Add a genuinely NEW structural element (badges, countdown timers)
+
+## If insertBefore/insertAfter Is Used (rare)
+When inserting new elements, use ONLY:
+- Simple inline-styled HTML with `display:block; position:relative; clear:both;` always included
+- Keep content SHORT (under 10 words)
+- NEVER use `position:absolute` or `position:fixed` (causes overlap on the live site)
+- Example (correct): <div style="display:block;position:relative;clear:both;background:#e53e3e;color:#fff;padding:6px 12px;text-align:center;font-weight:600;font-size:14px;margin-bottom:8px;">40% OFF — Today Only</div>
 
 ## Output Format
 Return a JSON object with this exact structure:
@@ -44,11 +58,6 @@ Return a JSON object with this exact structure:
         "new_text": "Summer Skincare Sale — 40% OFF",
         "original_text": "Discover Your Glow"
       },
-      {
-        "op": "insertBefore",
-        "selector": "h1.hero__title",
-        "html": "<div style=\\"background:#e53e3e;color:#fff;padding:6px 12px;display:inline-block;border-radius:4px;font-size:14px;font-weight:600;margin-bottom:8px;\\">Limited time offer</div>"
-      }
       {
         "op": "replaceStyle",
         "selector": "a.btn-primary",

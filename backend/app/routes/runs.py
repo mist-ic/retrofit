@@ -75,6 +75,10 @@ async def stream_run(run_id: str):
 
             thread_config = {"configurable": {"thread_id": run_id}}
 
+            print(f"[runs] 🚀 Starting pipeline for run {run_id[:8]}...")
+            print(f"[runs]    URL: {config['landing_page_url']}")
+            print(f"[runs]    Has image: {bool(config.get('ad_image_base64') or config.get('ad_image_url'))}")
+
             # In LangGraph 1.x, astream with multiple modes yields (mode, data) tuples
             async for event_tuple in pipeline_graph.astream(
                 initial_state,
@@ -90,11 +94,14 @@ async def stream_run(run_id: str):
                 if event_mode == "custom":
                     # Custom events emitted via writer() inside each node
                     evt = event_data.get("event", "custom")
+                    stage = event_data.get("stage", "?")
+                    print(f"[runs]   📡 custom → {evt} [{stage}]: {event_data.get('message', '')[:60]}")
                     yield _sse(evt, event_data)
 
                 elif event_mode == "updates":
                     # Node completed — emit node_complete with updated keys
                     for node_name, node_output in event_data.items():
+                        print(f"[runs]   ✓ node_complete: {node_name} → {list(node_output.keys())}")
                         yield _sse("node_complete", {
                             "node": node_name,
                             "keys_updated": list(node_output.keys()),
@@ -102,8 +109,13 @@ async def stream_run(run_id: str):
 
             # Pipeline finished — build and emit final result
             final_state_snapshot = pipeline_graph.get_state(config=thread_config)
-            result = _build_run_result(run_id, final_state_snapshot.values)
-            yield _sse("run_complete", result.model_dump())
+            try:
+                result = _build_run_result(run_id, final_state_snapshot.values)
+                yield _sse("run_complete", result.model_dump())
+            except Exception as result_err:
+                import traceback
+                print(f"[runs] Failed to build run result for {run_id}:\n{traceback.format_exc()}")
+                yield _sse("run_error", {"error": f"Result serialization failed: {result_err}", "run_id": run_id})
 
         except Exception as e:
             import traceback

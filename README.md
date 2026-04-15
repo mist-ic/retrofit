@@ -1,6 +1,6 @@
 # RetroFit
 
-Feeds an ad screenshot and a landing page URL into a pipeline of 6 AI agents that rewrite the hero section to match the ad — improving message match and conversion rate without touching the rest of the page.
+Feeds an ad screenshot and a landing page URL into a pipeline of 6 AI agents that rewrite the hero section to match the ad - improving message match and conversion rate without touching the rest of the page.
 
 **Live demo**: _coming soon_
 
@@ -12,12 +12,12 @@ Most landing pages are generic. They exist before any specific ad campaign, so t
 
 RetroFit closes that gap automatically. Given a Meta/Google ad creative and the destination landing page:
 
-1. Reads the ad — extracts the headline, offer, discount, CTA text, tone, and target audience
-2. Scrapes the landing page — maps the hero section, CTAs, social proof, and trust elements
-3. Scores the page — 7-criterion CRO audit against the specific ad
-4. Writes new copy — replacement text grounded entirely in the ad and original page content
-5. Patches the HTML — applies changes surgically via CSS selectors, never rewrites the full page
-6. Validates the output — checks for broken structure, layout regression, and hallucinated claims
+1. Reads the ad - extracts the headline, offer, discount, CTA text, tone, and target audience
+2. Scrapes the landing page - maps the hero section, CTAs, social proof, and trust elements
+3. Scores the page - 7-criterion CRO audit against the specific ad
+4. Writes new copy - replacement text grounded entirely in the ad and original page content
+5. Patches the HTML - applies changes surgically via CSS selectors, never rewrites the full page
+6. Validates the output - checks for broken structure, layout regression, and hallucinated claims
 
 The result: a personalized variant of the page with an audit trail explaining every change.
 
@@ -30,15 +30,15 @@ Ad Image + Landing URL
         │
         ▼
 ┌──────────────────────────────────────────────────────┐
-│                  LangGraph Pipeline                   │
-│                                                       │
+│                  LangGraph Pipeline                  │
+│                                                      │
 │  Ad Analyzer → Page Scraper → CRO Strategist         │
-│                                    │                  │
-│                               Copywriter              │
-│                                    │                  │
-│                           Code Modifier               │
-│                                    │                  │
-│                            QA Verifier ──► retry      │
+│                                    │                 │
+│                               Copywriter             │
+│                                    │                 │
+│                           Code Modifier              │
+│                                    │                 │
+│                            QA Verifier ──► retry     │
 └──────────────────────────────────────────────────────┘
         │
         ▼
@@ -47,18 +47,18 @@ Personalized page + CRO audit + before/after screenshots
 
 | Agent | Model | Role |
 |---|---|---|
-| Ad Analyzer | Gemini 3 Flash | Vision extraction — reads ad image into structured JSON |
+| Ad Analyzer | Gemini 3 Flash | Vision extraction - reads ad image into structured JSON |
 | Page Scraper | Firecrawl + Playwright | Scrapes HTML, screenshots, maps semantic elements |
 | CRO Strategist | Gemini 3.1 Pro | Scores page on 7 CRO criteria, proposes changes |
 | Copywriter | Gemini 3.1 Pro | Writes replacement copy for each change candidate |
-| Code Modifier | BeautifulSoup (deterministic) | Applies PatchSpec to HTML — no LLM writes raw HTML |
-| QA Verifier | Gemini 3 Flash | Validates output — structure, visual diff, hallucinations |
+| Code Modifier | BeautifulSoup (deterministic) | Applies PatchSpec to HTML - no LLM writes raw HTML |
+| QA Verifier | Gemini 3 Flash | Validates output - structure, visual diff, hallucinations |
 
 ---
 
 ## How it's different
 
-**LLMs don't write HTML here.** The copywriter outputs a `PatchSpec` — a JSON list of surgical operations (`replaceText`, `insertBefore`, `replaceStyle`). A deterministic function applies those to the DOM. This is what keeps outputs predictable and safe.
+**LLMs don't write HTML here.** The copywriter outputs a `PatchSpec` - a JSON list of surgical operations (`replaceText`, `insertBefore`, `replaceStyle`). A deterministic function applies those to the DOM. This is what keeps outputs predictable and safe.
 
 **Changes are grounded.** Every piece of new copy must be traceable to either the ad creative or the original page. The QA agent explicitly checks for hallucinated discount values, product names, or claims not present in the source material.
 
@@ -126,10 +126,10 @@ Open [http://localhost:3000](http://localhost:3000).
 Upload an ad → enter a landing page URL → watch the pipeline run → get:
 
 - **Before/after screenshot comparison** with a drag slider
-- **CRO scorecard** — 7 criteria scored 0–100 with before/after delta
-- **Explanation panel** — every change listed with the CRO principle it addresses
-- **HTML diff** — exact before/after text for each modified element
-- **QA report** — structural checks, hallucination flags, visual diff score
+- **CRO scorecard** - 7 criteria scored 0–100 with before/after delta
+- **Explanation panel** - every change listed with the CRO principle it addresses
+- **HTML diff** - exact before/after text for each modified element
+- **QA report** - structural checks, hallucination flags, visual diff score
 
 ---
 
@@ -140,7 +140,7 @@ Upload an ad → enter a landing page URL → watch the pipeline run → get:
 | Random/irrelevant changes | Only selectors from the SemanticMap are valid targets |
 | Broken layout | QA fails if key elements disappear or visual diff > 50% |
 | Hallucinated content | QA cross-checks all new text against ad + original page |
-| LLM writing broken HTML | Code Modifier is fully deterministic — LLMs output JSON, not HTML |
+| LLM writing broken HTML | Code Modifier is fully deterministic - LLMs output JSON, not HTML |
 | Stuck pipeline | Max 2 QA retries, then returns best-effort with warnings |
 
 ---
@@ -172,7 +172,3 @@ Upload an ad → enter a landing page URL → watch the pipeline run → get:
 ```
 
 ---
-
-## License
-
-MIT

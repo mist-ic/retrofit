@@ -40,7 +40,7 @@ async def cro_strategist_node(state: dict, writer: StreamWriter) -> dict:
 
 Analyze this page against the ad and return CROFindings JSON."""
 
-        response = client.models.generate_content(
+        response = await client.aio.models.generate_content(
             model=settings.gemini_pro_model,
             contents=[types.Content(role="user", parts=[types.Part(text=user_content)])],
             config=types.GenerateContentConfig(

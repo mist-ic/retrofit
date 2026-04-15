@@ -18,7 +18,7 @@ from app.prompts.copywriter import COPYWRITER_SYSTEM_PROMPT
 async def copywriter_node(state: dict, writer: StreamWriter) -> dict:
     """
     LangGraph node: generate replacement copy for each ChangeCandidate → PatchSpec + explanations.
-    Uses Gemini 3.1 Pro with thinking_level=medium.
+    Uses Gemini 3.1 Pro with thinking_level=high.
     """
     writer({"event": "stage_start", "stage": "copywriter", "message": "Writing personalized copy..."})
 
@@ -50,12 +50,12 @@ async def copywriter_node(state: dict, writer: StreamWriter) -> dict:
 
 Write replacement copy for each change candidate and return PatchSpec + explanations JSON."""
 
-        response = client.models.generate_content(
+        response = await client.aio.models.generate_content(
             model=settings.gemini_pro_model,
             contents=[types.Content(role="user", parts=[types.Part(text=user_content)])],
             config=types.GenerateContentConfig(
                 system_instruction=COPYWRITER_SYSTEM_PROMPT,
-                thinking_config=types.ThinkingConfig(thinking_level="medium"),
+                thinking_config=types.ThinkingConfig(thinking_level="high"),
                 response_mime_type="application/json",
             ),
         )

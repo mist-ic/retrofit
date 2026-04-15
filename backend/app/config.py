@@ -8,7 +8,6 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_flash_model: str = "gemini-3-flash-preview"
     gemini_pro_model: str = "gemini-3.1-pro-preview"
-    gemini_lite_model: str = "gemini-3.1-flash-lite-preview"
 
     # ── Firecrawl ─────────────────────────────────────────────────────────────
     firecrawl_api_key: str = ""

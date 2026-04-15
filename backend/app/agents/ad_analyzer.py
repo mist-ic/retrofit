@@ -45,7 +45,7 @@ async def ad_analyzer_node(state: dict, writer: StreamWriter) -> dict:
                 types.Part(text="No ad image provided. Return a minimal AdContext JSON with offer_type='none' and headline='(no ad)'.")
             )
 
-        response = client.models.generate_content(
+        response = await client.aio.models.generate_content(
             model=settings.gemini_flash_model,
             # contents must be a list of Content objects with explicit role (per models.md)
             contents=[types.Content(role="user", parts=user_parts)],
