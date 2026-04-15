@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { ReactCompareSlider } from "react-compare-slider";
 
 interface BeforeAfterSliderProps {
   originalScreenshotUrl: string;
   modifiedScreenshotUrl: string;
+  originalHtmlUrl?: string;
+  modifiedHtmlUrl?: string;
   fillParent?: boolean;
 }
 
@@ -33,11 +36,71 @@ function DragHandle() {
   );
 }
 
+function ScreenshotFallback({
+  originalHtmlUrl,
+  modifiedHtmlUrl,
+}: {
+  originalHtmlUrl?: string;
+  modifiedHtmlUrl?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-6 p-10 text-center">
+      <div className="w-14 h-14 border border-[#222] flex items-center justify-center text-[#333] text-2xl">
+        📸
+      </div>
+      <div>
+        <h3 className="font-heading text-lg text-white/60 mb-2">Screenshots unavailable</h3>
+        <p className="font-mono text-[11px] text-[#444] max-w-sm leading-relaxed">
+          The compare slider requires full-page screenshots which may not be available
+          for sites with anti-bot protection. Use the <strong className="text-[#D4FF26]">Preview</strong> tab
+          for a live side-by-side comparison instead.
+        </p>
+      </div>
+      {(originalHtmlUrl || modifiedHtmlUrl) && (
+        <div className="flex gap-3 mt-2">
+          {originalHtmlUrl && (
+            <a
+              href={originalHtmlUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-[11px] px-4 py-2 border border-[#333] text-[#888] hover:text-white hover:border-white/40 transition-all"
+            >
+              Open Original →
+            </a>
+          )}
+          {modifiedHtmlUrl && (
+            <a
+              href={modifiedHtmlUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-[11px] px-4 py-2 border border-[#D4FF26]/40 text-[#D4FF26] hover:bg-[#D4FF26] hover:text-black transition-all"
+            >
+              Open Optimized →
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BeforeAfterSlider({
   originalScreenshotUrl,
   modifiedScreenshotUrl,
+  originalHtmlUrl,
+  modifiedHtmlUrl,
   fillParent,
 }: BeforeAfterSliderProps) {
+  const [imgError, setImgError] = useState(false);
+
+  if (imgError) {
+    return (
+      <div className={`flex flex-col ${fillParent ? "h-full" : ""}`}>
+        <ScreenshotFallback originalHtmlUrl={originalHtmlUrl} modifiedHtmlUrl={modifiedHtmlUrl} />
+      </div>
+    );
+  }
+
   return (
     <div className={`flex flex-col ${fillParent ? "h-full" : ""}`}>
       {/* Top label bar */}
@@ -72,6 +135,7 @@ export function BeforeAfterSlider({
               alt="Original page"
               style={{ width: "100%", display: "block", verticalAlign: "top" }}
               draggable={false}
+              onError={() => setImgError(true)}
             />
           }
           itemTwo={
@@ -81,6 +145,7 @@ export function BeforeAfterSlider({
               alt="Optimized page"
               style={{ width: "100%", display: "block", verticalAlign: "top" }}
               draggable={false}
+              onError={() => setImgError(true)}
             />
           }
         />

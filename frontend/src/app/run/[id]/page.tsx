@@ -334,26 +334,26 @@ export default function RunDashboard({ params }: { params: Promise<{ id: string 
 
                   {/* Quick-open links for preview tabs */}
                   {(activeTab === "compare" || activeTab === "preview") && (
-                    <div className="flex items-center gap-1 px-3 border-l border-[#1a1a1a] shrink-0">
+                    <div className="flex items-center gap-2 px-4 border-l border-[#1a1a1a] shrink-0">
                       <a
                         href={originalHtmlUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="font-mono text-[9px] text-[#333] hover:text-[#D4FF26] flex items-center gap-1 px-2 py-1 border border-[#1a1a1a] hover:border-[#D4FF26]/30 transition-colors"
+                        className="font-mono text-[11px] text-[#888] hover:text-white flex items-center gap-1.5 px-3 py-1.5 border border-[#333] hover:border-white/40 transition-all rounded-sm bg-[#111] hover:bg-[#1a1a1a]"
                         title="Open original in new tab"
                       >
-                        <ExternalLink className="w-3 h-3" />
-                        <span className="hidden lg:inline">Original</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Original
                       </a>
                       <a
                         href={variantHtmlUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="font-mono text-[9px] text-[#D4FF26]/60 hover:text-[#D4FF26] flex items-center gap-1 px-2 py-1 border border-[#D4FF26]/20 hover:border-[#D4FF26]/50 transition-colors"
+                        className="font-mono text-[11px] text-[#D4FF26] hover:text-black flex items-center gap-1.5 px-3 py-1.5 border border-[#D4FF26]/40 hover:border-[#D4FF26] hover:bg-[#D4FF26] transition-all rounded-sm bg-[#D4FF26]/10"
                         title="Open optimized in new tab"
                       >
-                        <ExternalLink className="w-3 h-3" />
-                        <span className="hidden lg:inline">Optimized</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Optimized
                       </a>
                     </div>
                   )}
@@ -374,6 +374,8 @@ export default function RunDashboard({ params }: { params: Promise<{ id: string 
                       <BeforeAfterSlider
                         originalScreenshotUrl={originalSsUrl}
                         modifiedScreenshotUrl={modifiedSsUrl}
+                        originalHtmlUrl={originalHtmlUrl}
+                        modifiedHtmlUrl={variantHtmlUrl}
                         fillParent
                       />
                     )}
