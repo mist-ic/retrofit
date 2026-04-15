@@ -6,8 +6,10 @@
 
 **Close the gap between what your ad promises and what your page delivers.**
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-Visit_Now-000000?style=for-the-badge&logo=google-cloud&logoColor=white)](https://retrofit-frontend-411746695116.asia-south1.run.app)
-[![API Docs](https://img.shields.io/badge/API_Docs-Swagger-85EA2D?style=for-the-badge&logo=swagger&logoColor=black)](https://retrofit-backend-411746695116.asia-south1.run.app/docs)
+**[View Live Production Demo](https://retrofit-frontend-411746695116.asia-south1.run.app)** · **[View API Documentation](https://retrofit-backend-411746695116.asia-south1.run.app/docs)**
+
+<br/>
+
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)]()
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white)]()
 [![GCP](https://img.shields.io/badge/GCP-Cloud_Run-4285F4?style=flat-square&logo=google-cloud&logoColor=white)]()
@@ -20,16 +22,16 @@
 
 Most landing pages are generic. They exist before any specific ad campaign, so they can't reflect the offer, tone, or urgency of a particular ad. That gap between what the ad promises and what the page delivers kills conversions.
 
-**RetroFit closes that gap automatically.** Give it an ad creative and a landing page URL — it surgically rewrites the hero section to match the ad, improving message match and conversion rate without touching the rest of the page.
+**RetroFit closes that gap automatically.** Give it an ad creative and a landing page URL: it surgically rewrites the hero section to match the ad, improving message match and conversion rate without touching the rest of the page.
 
-> **Key constraint:** The output is the _existing page enhanced_ — not a new page. Every modification is a targeted CSS-selector operation on the real DOM, preserving the site's design, scripts, and structure.
+> **Key constraint:** The output is the _existing page enhanced_ - not a new page. Every modification is a targeted CSS-selector operation on the real DOM, preserving the site's design, scripts, and structure.
 
 ---
 
 ## How It Works
 
 ```
-                    ┌── Ad Analyzer (Flash) ──┐
+                   ┌── Ad Analyzer (Flash)  ──┐
  User Input ───────┤                          ├──► CRO Strategist (Pro)
  (Ad + URL)        └── Page Scraper ──────────┘          │
                                                     Copywriter (Pro)
@@ -50,11 +52,11 @@ Most landing pages are generic. They exist before any specific ad campaign, so t
 
 | Agent | Model | Thinking | What It Does |
 |---|---|---|---|
-| **Ad Analyzer** | Gemini 3 Flash | `low` | Vision — reads the ad image into structured JSON (headline, offer, discount, CTA, colors, tone) |
-| **Page Scraper** | Firecrawl + Playwright | — | Scrapes full HTML, takes screenshot, builds a semantic map of hero, CTAs, social proof elements |
+| **Ad Analyzer** | Gemini 3 Flash | `low` | Vision - reads the ad image into structured JSON (headline, offer, discount, CTA, colors, tone) |
+| **Page Scraper** | Firecrawl + Playwright | - | Scrapes full HTML, takes screenshot, builds a semantic map of hero, CTAs, social proof elements |
 | **CRO Strategist** | Gemini 3.1 Pro | `high` | Scores the page on 7 weighted CRO criteria against the ad, proposes prioritized changes |
 | **Copywriter** | Gemini 3.1 Pro | `high` | Generates replacement copy for each change candidate → outputs a structured PatchSpec (JSON) |
-| **Code Modifier** | BeautifulSoup | — | **Deterministic.** Applies the PatchSpec to the real DOM via CSS selectors. No LLM writes raw HTML. |
+| **Code Modifier** | BeautifulSoup | - | **Deterministic.** Applies the PatchSpec to the real DOM via CSS selectors. No LLM writes raw HTML. |
 | **QA Verifier** | Gemini 3 Flash | `high` | 5-layer validation: structural, key elements, rule-based hallucination, LLM cross-check, visual diff |
 
 ### Parallel Execution
@@ -63,7 +65,7 @@ Ad Analyzer and Page Scraper run **in parallel** (LangGraph fan-out/fan-in). The
 
 ---
 
-## CRO Scoring — 7 Criteria
+## CRO Scoring - 7 Criteria
 
 Every page is scored before and after modification:
 
@@ -92,7 +94,7 @@ The assignment asked: _"How do you handle random changes, broken UI, hallucinati
 
 ### The Key Design Decision
 
-**LLMs output JSON instructions, not HTML.** The Copywriter produces a `PatchSpec` — a list of operations like `replaceText("h1.hero__title", "40% Off Summer Skincare")`. A deterministic BeautifulSoup function applies them. This separates _intent_ (LLM) from _execution_ (code) and eliminates an entire class of formatting, syntax, and layout bugs.
+**LLMs output JSON instructions, not HTML.** The Copywriter produces a `PatchSpec` - a list of operations like `replaceText("h1.hero__title", "40% Off Summer Skincare")`. A deterministic BeautifulSoup function applies them. This separates _intent_ (LLM) from _execution_ (code) and eliminates an entire class of formatting, syntax, and layout bugs.
 
 ---
 
@@ -102,14 +104,14 @@ The assignment asked: _"How do you handle random changes, broken UI, hallucinati
 |---|---|
 | **Backend** | FastAPI (Python 3.12) + uvicorn (2 workers) |
 | **Agent Orchestration** | LangGraph `StateGraph` with parallel fan-out + conditional retry |
-| **Primary LLM** | Gemini 3.1 Pro (`gemini-3.1-pro-preview`) — strategy + copywriting |
-| **Vision LLM** | Gemini 3 Flash (`gemini-3-flash-preview`) — ad analysis + QA |
+| **Primary LLM** | Gemini 3.1 Pro (`gemini-3.1-pro-preview`) - strategy + copywriting |
+| **Vision LLM** | Gemini 3 Flash (`gemini-3-flash-preview`) - ad analysis + QA |
 | **LLM SDK** | `google-genai` (direct SDK, not LangChain wrappers) |
 | **Web Scraping** | Firecrawl API + Playwright (Chromium) |
 | **HTML Manipulation** | BeautifulSoup 4 + lxml |
 | **Frontend** | Next.js 16 (App Router) + TypeScript + Tailwind CSS 4 |
-| **Streaming** | Server-Sent Events (SSE) — real-time pipeline progress |
-| **Hosting** | GCP Cloud Run (asia-south1) — zero cold start (`min-instances=1`) |
+| **Streaming** | Server-Sent Events (SSE) - real-time pipeline progress |
+| **Hosting** | GCP Cloud Run (asia-south1) - zero cold start (`min-instances=1`) |
 | **Artifact Storage** | Google Cloud Storage |
 | **Observability** | LangSmith (optional) |
 
@@ -119,11 +121,11 @@ The assignment asked: _"How do you handle random changes, broken UI, hallucinati
 
 | Service | URL |
 |---|---|
-| 🌐 **Frontend** | https://retrofit-frontend-411746695116.asia-south1.run.app |
-| ⚡ **Backend API** | https://retrofit-backend-411746695116.asia-south1.run.app |
-| 📄 **API Docs** | https://retrofit-backend-411746695116.asia-south1.run.app/docs |
+| 🌐 **Frontend** | <https://retrofit-frontend-411746695116.asia-south1.run.app> |
+| ⚡ **Backend API** | <https://retrofit-backend-411746695116.asia-south1.run.app> |
+| 📄 **API Docs** | <https://retrofit-backend-411746695116.asia-south1.run.app/docs> |
 
-Both services run with `min-instances=1` — always warm, zero cold start latency.
+Both services run with `min-instances=1` - always warm, zero cold start latency.
 
 ---
 
@@ -167,12 +169,12 @@ Open [http://localhost:3000](http://localhost:3000).
 
 Upload an ad → enter a landing page URL → watch the 6-stage pipeline execute in real time → receive:
 
-- **Personalized page** — live HTML preview in iframe, fully interactive
-- **Before/after comparison** — screenshot slider for pixel-level visual diff
-- **CRO scorecard** — 7 criteria scored 0–100 with before/after delta
-- **Explanation panel** — every change listed with the CRO principle it addresses
-- **HTML diff** — exact before/after text for each modified element
-- **QA report** — structural integrity, hallucination flags, visual diff results
+- **Personalized page** - live HTML preview in iframe, fully interactive
+- **Before/after comparison** - screenshot slider for pixel-level visual diff
+- **CRO scorecard** - 7 criteria scored 0-100 with before/after delta
+- **Explanation panel** - every change listed with the CRO principle it addresses
+- **HTML diff** - exact before/after text for each modified element
+- **QA report** - structural integrity, hallucination flags, visual diff results
 
 ---
 
