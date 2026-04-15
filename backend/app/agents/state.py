@@ -1,7 +1,12 @@
 """LangGraph graph state TypedDict — shared across all pipeline nodes."""
 
-from typing import List, Optional
+from typing import Annotated, List, Optional
 from typing_extensions import TypedDict
+
+# Reducer for scalar fields written by parallel nodes (last-writer-wins).
+# ad_analyzer and page_scraper run concurrently and both write `current_stage`
+# and `error`; without a reducer LangGraph raises INVALID_CONCURRENT_GRAPH_UPDATE.
+_last = lambda a, b: b  # noqa: E731
 
 
 class GraphState(TypedDict, total=False):
@@ -30,10 +35,11 @@ class GraphState(TypedDict, total=False):
     explanations: List[dict]          # List[ExplanationItem.model_dump()]
 
     # ── Control flow ──────────────────────────────────────────────────────────
+    # NOTE: Annotated[..., _last] required for fields written by parallel nodes.
     retry_count: int
     max_retries: int
-    current_stage: Optional[str]
-    error: Optional[str]
+    current_stage: Annotated[Optional[str], _last]
+    error: Annotated[Optional[str], _last]
 
     # ── Scores ────────────────────────────────────────────────────────────────
     cro_score_before: Optional[float]
