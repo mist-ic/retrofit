@@ -34,20 +34,30 @@ This is critical because inserted elements on Shopify/live sites frequently caus
 (overlapping positioned elements, z-index conflicts). Replacing existing text is always safer.
 
 ## PatchSpec Operation Types
-- `replaceText`: Replace an element's text content — preferred approach for all copy changes
-- `replaceStyle`: Override inline styles (e.g., change CTA button color to match ad)
-- `insertBefore` / `insertAfter`: Add a genuinely NEW structural element (badges, countdown timers)
-  - **REQUIRED fields**: `op`, `selector`, `html` — the `html` field is MANDATORY, never omit it
 
-## If insertBefore/insertAfter Is Used (rare)
-When inserting new elements, use ONLY:
-- Simple inline-styled HTML with `display:block; position:relative; clear:both;` always included
+### replaceText (PREFERRED — use this for 90%+ of changes)
+Fields: `op`, `selector`, `new_text`, `original_text` (optional)
+
+### replaceStyle
+Fields: `op`, `selector`, `css_text`
+
+### insertBefore / insertAfter (RARE — only for genuinely new elements)
+Fields: `op`, `selector`, `html`
+
+⚠️ CRITICAL: The field name is `html`, NOT `content`, NOT `new_html`, NOT `markup`.
+The field is called `html`. You MUST include ``"html": "<your html>"`` in every insertBefore/insertAfter op.
+If you omit the `html` field or use a different field name, the operation WILL FAIL.
+
+When inserting new elements:
+- Use simple inline-styled HTML with `display:block; position:relative; clear:both;` always included
 - Keep content SHORT (under 10 words)
 - NEVER use `position:absolute` or `position:fixed` (causes overlap on the live site)
-- Example (correct): <div style="display:block;position:relative;clear:both;background:#e53e3e;color:#fff;padding:6px 12px;text-align:center;font-weight:600;font-size:14px;margin-bottom:8px;">40% OFF — Today Only</div>
 
 ## Output Format
-Return a JSON object with this exact structure:
+
+Return a JSON object with this EXACT structure. Follow the field names EXACTLY as shown:
+
+```json
 {
   "patch_spec": {
     "variant_id": "hero-variant-a",
@@ -66,8 +76,8 @@ Return a JSON object with this exact structure:
       },
       {
         "op": "insertAfter",
-        "selector": ".hero__title",
-        "html": "<div style=\"display:block;position:relative;clear:both;background:#e53e3e;color:#fff;padding:6px 12px;text-align:center;font-weight:600;font-size:14px;margin-bottom:8px;\">40% OFF — Today Only</div>"
+        "selector": ".hero__subtitle",
+        "html": "<div style=\\"display:block;position:relative;clear:both;background:#e53e3e;color:#fff;padding:6px 12px;text-align:center;font-weight:600;font-size:14px;margin-bottom:8px;\\">40% OFF — Today Only</div>"
       }
     ]
   },
@@ -79,9 +89,15 @@ Return a JSON object with this exact structure:
       "new_text": "Summer Skincare Sale — 40% OFF",
       "change_type": "copy",
       "cro_principles": ["message_match", "hero_clarity"],
-      "rationale": "Restates the 40% OFF offer from the ad headline to improve message match for users arriving from this campaign."
+      "rationale": "Restates the 40% OFF offer from the ad headline to improve message match."
     }
   ]
 }
+```
 
-Return ONLY valid JSON."""
+## FIELD NAME REMINDERS (read carefully — these cause errors if wrong)
+- replaceText → field is `new_text` (not `text`, not `content`)
+- replaceStyle → field is `css_text` (not `css`, not `style`, not `value`)
+- insertBefore/insertAfter → field is `html` (not `content`, not `new_html`, not `markup`)
+
+Return ONLY valid JSON. No markdown, no explanation, no commentary."""

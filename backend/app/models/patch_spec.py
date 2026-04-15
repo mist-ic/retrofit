@@ -39,6 +39,34 @@ class RemoveClassOp(BaseModel):
     class_name: str
 
 
+# ── Alias coercion for html field ─────────────────────────────────────────────
+# Gemini models frequently use 'content', 'new_html', 'markup', 'snippet',
+# 'value', 'text', or 'inner_html' instead of the required 'html' key.
+_HTML_ALIASES = ("content", "new_html", "markup", "snippet", "value", "text", "inner_html")
+
+_DEFAULT_HTML = (
+    '<div style="display:block;position:relative;clear:both;'
+    'padding:4px 8px;"></div>'
+)
+
+
+def _coerce_html_field(data: object) -> object:
+    """Normalize LLM output: coerce alternative field names to 'html'."""
+    if not isinstance(data, dict):
+        return data
+    if "html" in data and data["html"]:
+        return data
+    data = dict(data)
+    for alias in _HTML_ALIASES:
+        if alias in data and data[alias]:
+            data["html"] = data.pop(alias)
+            return data
+    # Last resort — set a safe fallback so Pydantic doesn't crash
+    if "html" not in data or not data.get("html"):
+        data["html"] = _DEFAULT_HTML
+    return data
+
+
 class InsertBeforeOp(BaseModel):
     """Insert an HTML snippet immediately before a target element."""
 
@@ -54,15 +82,9 @@ class InsertBeforeOp(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def require_html(cls, data: object) -> object:
-        """If LLM omits `html`, fall back to a safe empty div to avoid hard crash."""
-        if isinstance(data, dict) and not data.get("html"):
-            data = dict(data)
-            data["html"] = (
-                '<div style="display:block;position:relative;clear:both;'
-                'padding:4px 8px;"></div>'
-            )
-        return data
+    def coerce_html_alias(cls, data: object) -> object:
+        """LLM sometimes returns 'content', 'new_html', etc. instead of 'html'."""
+        return _coerce_html_field(data)
 
 
 class InsertAfterOp(BaseModel):
@@ -80,15 +102,9 @@ class InsertAfterOp(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def require_html(cls, data: object) -> object:
-        """If LLM omits `html`, fall back to a safe empty div to avoid hard crash."""
-        if isinstance(data, dict) and not data.get("html"):
-            data = dict(data)
-            data["html"] = (
-                '<div style="display:block;position:relative;clear:both;'
-                'padding:4px 8px;"></div>'
-            )
-        return data
+    def coerce_html_alias(cls, data: object) -> object:
+        """LLM sometimes returns 'content', 'new_html', etc. instead of 'html'."""
+        return _coerce_html_field(data)
 
 
 class ReplaceStyleOp(BaseModel):
@@ -132,6 +148,33 @@ PatchOperation = Annotated[
 ]
 
 
+def sanitize_operations(raw_ops: list) -> list:
+    """
+    Pre-process raw LLM operation dicts BEFORE PatchSpec.model_validate().
+
+    Pydantic discriminated unions can skip model_validators in some cases,
+    so we defensively fix known LLM output issues at the list level.
+    This is the primary defense; the per-model validators are a backup.
+    """
+    cleaned = []
+    for op_dict in raw_ops:
+        if not isinstance(op_dict, dict):
+            cleaned.append(op_dict)
+            continue
+        op_type = op_dict.get("op", "")
+        if op_type in ("insertBefore", "insertAfter"):
+            op_dict = _coerce_html_field(op_dict)
+        elif op_type == "replaceStyle":
+            if "css_text" not in op_dict:
+                for alias in ("css", "style", "css_value", "value"):
+                    if alias in op_dict:
+                        op_dict = dict(op_dict)
+                        op_dict["css_text"] = op_dict.pop(alias)
+                        break
+        cleaned.append(op_dict)
+    return cleaned
+
+
 class PatchSpec(BaseModel):
     """Complete set of surgical instructions for modifying a landing page."""
 
@@ -140,3 +183,13 @@ class PatchSpec(BaseModel):
     operations: List[PatchOperation] = Field(
         description="Ordered list of operations to apply. Applied sequentially."
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def pre_sanitize_ops(cls, data: object) -> object:
+        """Run sanitize_operations on the raw operations list before Pydantic touches it."""
+        if isinstance(data, dict) and "operations" in data:
+            data = dict(data)
+            data["operations"] = sanitize_operations(data["operations"])
+        return data
+
