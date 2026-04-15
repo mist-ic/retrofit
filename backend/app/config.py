@@ -15,7 +15,8 @@ class Settings(BaseSettings):
     # ── Storage ───────────────────────────────────────────────────────────────
     google_cloud_project: str = ""
     gcs_bucket: str = ""
-    use_local_storage: bool = True  # True = /tmp; False = GCS
+    # Auto-detected: False when GCS_BUCKET is set, True otherwise
+    use_local_storage: bool = True
 
     # ── CORS ──────────────────────────────────────────────────────────────────
     frontend_url: str = "http://localhost:3000"
@@ -28,6 +29,11 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         extra = "ignore"
+
+    def model_post_init(self, __context) -> None:
+        # If a GCS bucket is configured, automatically switch to cloud storage
+        if self.gcs_bucket:
+            object.__setattr__(self, "use_local_storage", False)
 
 
 settings = Settings()
