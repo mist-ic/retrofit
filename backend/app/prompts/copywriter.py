@@ -37,6 +37,7 @@ This is critical because inserted elements on Shopify/live sites frequently caus
 - `replaceText`: Replace an element's text content — preferred approach for all copy changes
 - `replaceStyle`: Override inline styles (e.g., change CTA button color to match ad)
 - `insertBefore` / `insertAfter`: Add a genuinely NEW structural element (badges, countdown timers)
+  - **REQUIRED fields**: `op`, `selector`, `html` — the `html` field is MANDATORY, never omit it
 
 ## If insertBefore/insertAfter Is Used (rare)
 When inserting new elements, use ONLY:
@@ -62,6 +63,11 @@ Return a JSON object with this exact structure:
         "op": "replaceStyle",
         "selector": "a.btn-primary",
         "css_text": "background-color: #e53e3e; color: #fff; border-color: #e53e3e;"
+      },
+      {
+        "op": "insertAfter",
+        "selector": ".hero__title",
+        "html": "<div style=\"display:block;position:relative;clear:both;background:#e53e3e;color:#fff;padding:6px 12px;text-align:center;font-weight:600;font-size:14px;margin-bottom:8px;\">40% OFF — Today Only</div>"
       }
     ]
   },

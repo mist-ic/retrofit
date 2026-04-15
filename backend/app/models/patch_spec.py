@@ -42,23 +42,53 @@ class RemoveClassOp(BaseModel):
 class InsertBeforeOp(BaseModel):
     """Insert an HTML snippet immediately before a target element."""
 
+    model_config = ConfigDict(extra="ignore")
+
     op: Literal["insertBefore"]
     selector: str
     html: str = Field(
+        default="",
         description="Inline-styled HTML snippet to insert. Keep simple — "
         "<div> or <span> with inline styles only."
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def require_html(cls, data: object) -> object:
+        """If LLM omits `html`, fall back to a safe empty div to avoid hard crash."""
+        if isinstance(data, dict) and not data.get("html"):
+            data = dict(data)
+            data["html"] = (
+                '<div style="display:block;position:relative;clear:both;'
+                'padding:4px 8px;"></div>'
+            )
+        return data
 
 
 class InsertAfterOp(BaseModel):
     """Insert an HTML snippet immediately after a target element."""
 
+    model_config = ConfigDict(extra="ignore")
+
     op: Literal["insertAfter"]
     selector: str
     html: str = Field(
+        default="",
         description="Inline-styled HTML snippet to insert. Keep simple — "
         "<div> or <span> with inline styles only."
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def require_html(cls, data: object) -> object:
+        """If LLM omits `html`, fall back to a safe empty div to avoid hard crash."""
+        if isinstance(data, dict) and not data.get("html"):
+            data = dict(data)
+            data["html"] = (
+                '<div style="display:block;position:relative;clear:both;'
+                'padding:4px 8px;"></div>'
+            )
+        return data
 
 
 class ReplaceStyleOp(BaseModel):
